@@ -3,6 +3,9 @@
 # Ana ba da shawarar amfani da environment variables don tsaro.
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # ← Wannan zai ɗora duk `.env` variables
 
 # Telegram Bot Token
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE")
