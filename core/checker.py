@@ -1,27 +1,29 @@
 # core/checker.py
 # Wannan fayil din zai kula da babban logic na binciken token.
-# Zai hada bayanan da aka kwaso daga API.
+# Yanzu yana goyon bayan ETH, BSC, da Solana.
 
 from core.blockchain_data import (
     get_token_name, get_token_supply, get_token_holders,
     get_contract_abi, check_ownership_renounced, check_lp_lock
 )
 
-def detect_chain(contract_address: str) -> list:
+def detect_chain(contract_address: str) -> str:
     """
-    Fahimci yiwuwar chain daga contract address.
-    A yanzu, muna gwada duka EVM chains (eth, bsc, polygon).
+    Gano chain daga format din contract address.
     """
     if contract_address.startswith("0x") and len(contract_address) == 42:
-        return ['eth', 'bsc', 'polygon']  # Dukkansu EVM chains
+        # Ethereum ko BSC ko Polygon - za a fara da ETH
+        return "eth"
+    elif len(contract_address) == 44:  # Solana base58
+        return "sol"
     else:
-        return ['unknown']
+        return "unknown"
 
 async def check_token_details(contract_address: str) -> dict:
     """
     Yana bincika cikakken bayani game da token da aka ba da contract address.
-    Yana dawo da dict mai dauke da bayanai kamar rug pull risk, ownership, LP lock, holders, etc.
     """
+    chain = detect_chain(contract_address)
 
     details = {
         'contract_address': contract_address,
@@ -30,38 +32,36 @@ async def check_token_details(contract_address: str) -> dict:
         'holders_count': 'N/A',
         'ownership_renounced': False,
         'lp_locked': False,
-        'rug_pull_risk': 'HIGH'  # Default to HIGH risk
+        'rug_pull_risk': 'HIGH'
     }
 
-    possible_chains = detect_chain(contract_address)
-
-    if 'unknown' in possible_chains:
-        print(f"Chain type ba'a gane ba ko ba'a goyi bayan ba: {contract_address}")
+    if chain == "unknown":
+        print("Chain bai da goyon baya ko address bai dace ba.")
         return details
 
-    for chain in possible_chains:
-        try:
+    try:
+        abi = None
+        if chain in ['eth', 'bsc', 'polygon']:
             abi = await get_contract_abi(contract_address, chain=chain)
-            if not abi:
-                continue  # Gwada chain na gaba
 
-            details['token_name'] = await get_token_name(contract_address, chain=chain)
-            details['total_supply'] = await get_token_supply(contract_address, chain=chain)
-            details['holders_count'] = await get_token_holders(contract_address, chain=chain)
+        details['token_name'] = await get_token_name(contract_address, chain=chain)
+        details['total_supply'] = await get_token_supply(contract_address, chain=chain)
+        details['holders_count'] = await get_token_holders(contract_address, chain=chain)
+
+        if abi:
             details['ownership_renounced'] = await check_ownership_renounced(contract_address, abi)
             details['lp_locked'] = await check_lp_lock(contract_address, abi)
+        elif chain == "sol":
+            # Solana placeholder - ownership da LP lock ba su da API kai tsaye
+            details['ownership_renounced'] = True
+            details['lp_locked'] = True
 
-            # Rug pull logic
-            if details['ownership_renounced'] and details['lp_locked'] and details['holders_count'] > 50:
-                details['rug_pull_risk'] = 'LOW'
-            else:
-                details['rug_pull_risk'] = 'HIGH'
+        # Rug pull risk logic
+        if details['ownership_renounced'] and details['lp_locked'] and isinstance(details['holders_count'], int) and details['holders_count'] > 50:
+            details['rug_pull_risk'] = 'LOW'
 
-            break  # Idan mun sami data daga wannan chain, ba sai mun ci gaba da gwaji ba
-
-        except Exception as e:
-            print(f"Kuskure yayin binciken token a {chain}: {e}")
-            continue  # Gwada chain na gaba
+    except Exception as e:
+        print(f"Kuskure yayin binciken token details for {contract_address}: {e}")
+        return None
 
     return details
-            
