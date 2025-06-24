@@ -1,5 +1,5 @@
 python-telegram-bot
 Flask
 aiohttp
-web3
+web3==6.11.1
 python-dotenv
