@@ -1,0 +1,5 @@
+python-telegram-bot
+Flask
+aiohttp
+web3
+python-dotenv
